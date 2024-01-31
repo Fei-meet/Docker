@@ -114,3 +114,177 @@ https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi
 ```
 
 ![1.png](Docker.assets/l25jdwrn.png)
+
+## Docker 快速安装软件
+
+### 直接安装的缺点
+
+- 安装麻烦，可能有各种依赖，运行报错。例如：WordPress，ElasticSearch，Redis，ELK
+- 可能对 Windows 并不友好，运行有各种兼容问题，软件只支持 Linux 上跑
+- 不方便安装多版本软件，不能共存。
+- 电脑安装了一堆软件，拖慢电脑速度。
+- 不同系统和硬件，安装方式不一样
+
+### Docker 安装的优点
+
+- 一个命令就可以安装好，快速方便
+- 有大量的镜像，可直接使用
+- 没有系统兼容问题，Linux 专享软件也照样跑
+- 支持软件多版本共存
+- 用完就丢，不拖慢电脑速度
+- 不同系统和硬件，只要安装好 Docker 其他都一样了，一个命令搞定所有
+
+### 演示 Docker 安装 Redis
+
+Redis 官网：https://redis.io/
+
+> 官网下载安装教程只有源码安装方式，没有 Windows 版本。想要自己安装 windows 版本需要去找别人编译好的安装包。
+
+Docker 官方镜像仓库查找 Redis ：https://hub.docker.com/
+![Docker镜像官网](Docker.assets/kv8zs4qr.png)
+
+一个命令跑起来：`docker run -d -p 6379:6379 --name redis redis:latest`
+命令参考：https://docs.docker.com/engine/reference/commandline/run/
+
+![Docker运行Redis后](Docker.assets/kv8zy4xn.png)
+
+### 安装 Wordpress
+
+docker-compose.yml
+
+```
+version: '3.1'
+
+services:
+
+  wordpress:
+    image: wordpress
+    restart: always
+    ports:
+      - 8080:80
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: exampleuser
+      WORDPRESS_DB_PASSWORD: examplepass
+      WORDPRESS_DB_NAME: exampledb
+    volumes:
+      - wordpress:/var/www/html
+
+  db:
+    image: mysql:5.7
+    restart: always
+    environment:
+      MYSQL_DATABASE: exampledb
+      MYSQL_USER: exampleuser
+      MYSQL_PASSWORD: examplepass
+      MYSQL_RANDOM_ROOT_PASSWORD: '1'
+    volumes:
+      - db:/var/lib/mysql
+
+volumes:
+  wordpress:
+  db:
+```
+
+### 安装 ELK
+
+```
+docker run -p 5601:5601 -p 9200:9200 -p 5044:5044 -it --name elk sebp/elk
+```
+
+[内存不够解决方法](https://docs.microsoft.com/en-us/windows/wsl/wsl-config#global-configuration-options-with-wslconfig)
+转到用户目录 `cd ~`，路径类似这个：`C:\Users\<UserName>`
+创建 `.wslconfig` 文件填入以下内容
+
+```
+[wsl2]
+memory=10GB # Limits VM memory in WSL 2 to 4 GB
+processors=2 # Makes the WSL 2 VM use two virtual processors
+```
+
+生效配置，命令行运行 `wsl --shutdown`
+
+### 更多相关命令
+
+`docker ps` 查看当前运行中的容器
+
+`docker images` 查看镜像列表
+
+`docker rm container-id` 删除指定 id 的容器
+
+`docker stop/start container-id` 停止/启动指定 id 的容器
+
+`docker rmi image-id` 删除指定 id 的镜像
+
+`docker volume ls` 查看 volume 列表
+
+`docker network ls` 查看网络列表
+
+## 制作自己的镜像
+
+### 为自己的 Web 项目构建镜像
+
+示例项目代码：https://github.com/gzyunke/test-docker
+这是一个 Nodejs + Koa2 写的 Web 项目，提供了简单的两个演示页面。
+软件依赖：[nodejs](https://nodejs.org/zh-cn/)
+项目依赖库：koa、log4js、koa-router
+
+### 编写 Dockerfile
+
+```dockerfile
+FROM node:11
+MAINTAINER easydoc.net
+
+# 复制代码
+ADD . /app
+
+# 设置容器启动后的默认运行目录
+WORKDIR /app
+
+# 运行命令，安装依赖
+# RUN 命令可以有多个，但是可以用 && 连接多个命令来减少层级。
+# 例如 RUN npm install && cd /app && mkdir logs
+RUN npm install --registry=https://registry.npm.taobao.org
+
+# CMD 指令只能一个，是容器启动后执行的命令，算是程序的入口。
+# 如果还需要运行其他命令可以用 && 连接，也可以写成一个shell脚本去执行。
+# 例如 CMD cd /app && ./start.sh
+CMD node app.js
+```
+
+[Dockerfile文档](https://docs.docker.com/engine/reference/builder/#run)
+
+> 实用技巧：
+> 如果你写 Dockerfile 时经常遇到一些运行错误，依赖错误等，你可以直接运行一个依赖的底，然后进入终端进行配置环境，成功后再把做过的步骤命令写道 Dockerfile 文件中，这样编写调试会快很多。
+> 例如上面的底是`node:11`，我们可以运行`docker run -it -d node:11 bash`，跑起来后进入容器终端配置依赖的软件，然后尝试跑起来自己的软件，最后把所有做过的步骤写入到 Dockerfile 就好了。
+> 掌握好这个技巧，你的 Dockerfile 文件编写起来就非常的得心应手了。
+
+### Build 为镜像（安装包）和运行
+
+编译 `docker build -t test:v1 .`
+
+> `-t` 设置镜像名字和版本号
+> 命令参考：https://docs.docker.com/engine/reference/commandline/build/
+
+运行 `docker run -p 8080:8080 --name test-hello test:v1`
+
+> `-p` 映射容器内端口到宿主机
+> `--name` 容器名字
+> `-d` 后台运行
+> 命令参考文档：https://docs.docker.com/engine/reference/run/
+
+### 更多相关命令
+
+`docker ps` 查看当前运行中的容器
+
+`docker images` 查看镜像列表
+
+`docker rm container-id` 删除指定 id 的容器
+
+`docker stop/start container-id` 停止/启动指定 id 的容器
+
+`docker rmi image-id` 删除指定 id 的镜像
+
+`docker volume ls` 查看 volume 列表
+
+`docker network ls` 查看网络列表
