@@ -1,4 +1,4 @@
-# Docker_ForACP（Updating）
+# Docker_ForACP
 
 The project is a simple introduction to dockers, the reference video and website are:
 
